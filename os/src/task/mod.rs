@@ -20,7 +20,7 @@ use crate::sync::UPSafeCell;
 use lazy_static::*;
 use switch::__switch;
 pub use task::{TaskControlBlock, TaskStatus};
-
+pub use crate::syscall::SYSCALL_COUNT_LEN;
 pub use context::TaskContext;
 
 /// The task manager, where all the tasks are managed.
@@ -45,6 +45,7 @@ pub struct TaskManagerInner {
     tasks: [TaskControlBlock; MAX_APP_NUM],
     /// id of current `Running` task
     current_task: usize,
+
 }
 
 lazy_static! {
@@ -54,6 +55,7 @@ lazy_static! {
         let mut tasks = [TaskControlBlock {
             task_cx: TaskContext::zero_init(),
             task_status: TaskStatus::UnInit,
+            sys_count: [0; SYSCALL_COUNT_LEN],
         }; MAX_APP_NUM];
         for (i, task) in tasks.iter_mut().enumerate() {
             task.task_cx = TaskContext::goto_restore(init_app_cx(i));
@@ -140,6 +142,25 @@ impl TaskManager {
 /// Run the first task in task list.
 pub fn run_first_task() {
     TASK_MANAGER.run_first_task();
+}
+
+/// 查询当前任务调用编号为 id 的系统调用的次数。
+///
+/// # Panics
+/// id 超出计数数组范围时会 panic。
+pub fn check_id_count(id:usize)->usize{
+    let inner: core::cell::RefMut<'_, TaskManagerInner> = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].sys_count[id]
+}
+/// 将当前任务调用编号为 id 的系统调用次数加一。
+///
+/// # Panics
+/// id 超出计数数组范围时会 panic。
+pub fn incre_id_count(id:usize){
+    let mut inner: core::cell::RefMut<'_, TaskManagerInner> = TASK_MANAGER.inner.exclusive_access();
+    let current = inner.current_task;
+    inner.tasks[current].sys_count[id]+=1;
 }
 
 /// Switch current `Running` task to the task we have found,

@@ -20,21 +20,25 @@ const SYSCALL_YIELD: usize = 124;
 const SYSCALL_GET_TIME: usize = 169;
 /// trace syscall
 const SYSCALL_TRACE: usize = 410;
-
+/// 系统调用计数表长度，可索引编号 0 到 410。
+pub const SYSCALL_COUNT_LEN: usize = 411;
 mod fs;
 mod process;
 
 use fs::*;
 use process::*;
-
+use crate::task::incre_id_count;
 /// handle syscall exception with `syscall_id` and other arguments
 pub fn syscall(syscall_id: usize, args: [usize; 3]) -> isize {
+    // 在分发前计数，使本次 trace 查询也包含在统计中。
+    incre_id_count(syscall_id);
     match syscall_id {
         SYSCALL_WRITE => sys_write(args[0], args[1] as *const u8, args[2]),
         SYSCALL_EXIT => sys_exit(args[0] as i32),
         SYSCALL_YIELD => sys_yield(),
         SYSCALL_GET_TIME => sys_get_time(args[0] as *mut TimeVal, args[1]),
         SYSCALL_TRACE => sys_trace(args[0], args[1], args[2]),
+
         _ => panic!("Unsupported syscall_id: {}", syscall_id),
     }
 }

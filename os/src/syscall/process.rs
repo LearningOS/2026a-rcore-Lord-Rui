@@ -1,7 +1,7 @@
 //! Process management syscalls
 use crate::{
-    task::{exit_current_and_run_next, suspend_current_and_run_next},
-    timer::get_time_us,
+    // syscall::{SYSCALL_EXIT, SYSCALL_GET_TIME, SYSCALL_TRACE, SYSCALL_YIELD}, 
+    task::{check_id_count, exit_current_and_run_next,  suspend_current_and_run_next}, timer::get_time_us,
 };
 
 #[repr(C)]
@@ -15,7 +15,7 @@ pub struct TimeVal {
 pub fn sys_exit(exit_code: i32) -> ! {
     trace!("[kernel] Application exited with code {}", exit_code);
     exit_current_and_run_next();
-    panic!("Unreachable in sys_exit!");
+    panic!("Unreachable in sys_exit!") 
 }
 
 /// current task gives up resources for other tasks
@@ -38,8 +38,29 @@ pub fn sys_get_time(ts: *mut TimeVal, _tz: usize) -> isize {
     0
 }
 
-// TODO: implement the syscall
-pub fn sys_trace(_trace_request: usize, _id: usize, _data: usize) -> isize {
+/// 根据请求读取一个字节、写入一个字节，或查询当前任务的系统调用次数。
+/// 请求 0、1 将 id 作为地址；请求 2 将 id 作为系统调用编号。
+/// 写入时仅保留 data 的最低一个字节，未知请求返回 -1。
+pub fn sys_trace(trace_request: usize, id: usize, data: usize) -> isize {
     trace!("kernel: sys_trace");
-    -1
+    match trace_request{
+        0 => {
+            let ptr = id as *const u8;
+            let value = unsafe {
+                *ptr
+            };
+            return value as isize;
+        },
+        1 => {
+            let ptr = id as *mut u8;
+            unsafe {
+                *ptr = data as u8;
+            }
+            return 0;
+        },
+        2 => {
+            check_id_count(id) as isize
+        },
+        _=> {return -1;},
+    }
 }
